@@ -1,0 +1,82 @@
+[
+  {
+    "timestamp": "2025-03-01T16:54:52.623665",
+    "event": "start_command",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "inline_keyboard": true
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:13.646667",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 2"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:14.433752",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 3"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:15.544835",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 4"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:15.890471",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 5"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:16.281577",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 6"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:17.033779",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 7"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:17.397800",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 8"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:17.726574",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 9"
+    }
+  },
+  {
+    "timestamp": "2025-03-01T16:55:28.705170",
+    "event": "message_sent",
+    "data": {
+      "chat_id": "test@misis-dlya-proekta-vk-obrazovanie.bizml.ru",
+      "text": "Отвечаю на сообщение: 0"
+    }
+  }
+]

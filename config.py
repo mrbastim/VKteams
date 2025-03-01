@@ -4,8 +4,8 @@ NAMES = []
 ID = []
 
 # PostgreSQL
-DB_NAME = "VKTeams_bot"
-DB_USER = "superuser"
-DB_PASS = "root"
-DB_HOST = "localhost"
-DB_PORT = "5432"
+# DB_NAME = "VKTeams_bot"
+# DB_USER = "postgres"
+# DB_PASS = "root"
+# DB_HOST = "localhost"
+# DB_PORT = "5432"

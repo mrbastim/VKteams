@@ -3,7 +3,7 @@ import json
 from bot.handler import MessageHandler, CommandHandler, BotButtonCommandHandler, StartCommandHandler
 from bot.filter import Filter
 from reporting import ReportManager
-from scheduler import add_job  # импортируем функцию для добавления задач
+from scheduler import add_job, remove_all_jobs  # импортируем функцию для добавления задач
 
 pending_schedule = {}  # хранение ожидания ввода параметров рассылки
 
@@ -17,12 +17,16 @@ def register_handlers(dispatcher):
 
     def buttons_answer_cb(bot, event):
         reporter.log_event("button_click", {"chat_id": event.from_chat, "callback_data": event.data['callbackData']})
-        if event.data['callbackData'] == "call_back_id_2":
+        if event.data['callbackData'] == "call_back_scheduler_delete":
+            remove_all_jobs()
+            # send_message(bot, event.from_chat, text="Все запланированные рассылки удалены")
+            # bot.send_text(chat_id=event.from_chat, text="Все запланированные рассылки удалены")
             bot.answer_callback_query(
                 query_id=event.data['queryId'],
-                text="Hey! It's a working button 2.",
-                show_alert=True
+                text="Все запланированные рассылки удалены",
+                show_alert=False
             )
+            reporter.log_event("all_jobs_deleted", {"chat_id": event.from_chat})
         elif event.data['callbackData'] == "call_back_id_3":
             bot.answer_callback_query(
                 query_id=event.data['queryId'],
@@ -40,7 +44,7 @@ def register_handlers(dispatcher):
                       inline_keyboard_markup="{}".format(json.dumps([
                           [
                               {"text": "Запланировать рассылку\n Временно самому себе", "callbackData": "call_back_scheduler", "style": "primary"},
-                              {"text": "Action 2", "callbackData": "call_back_id_2", "style": "attention"},
+                              {"text": "Удалить все \nзапланированные рассылки", "callbackData": "call_back_scheduler_delete", "style": "attention"},
                               {"text": "Action 3", "callbackData": "call_back_id_3", "style": "primary"}
                           ]
                       ]))
@@ -56,11 +60,8 @@ def register_handlers(dispatcher):
                 # Если строка содержит пробел, то считаем, что передана дата и время без года
                 if " " in dt_str:
                     date_part, time_part = dt_str.split(maxsplit=1)
-                    # приводим разделитель даты к дефису
                     date_part = date_part.replace(".", "-")
-                    # Пробуем создать дату с текущим годом
                     date_obj = datetime.strptime(f"{datetime.now().year}-{date_part}", "%Y-%d-%m")
-                    # заменяем разделитель времени, если требуется
                     time_part = time_part.replace(".", ":")
                     time_obj = datetime.strptime(time_part, "%H:%M").time()
                     scheduled_time = datetime.combine(date_obj.date(), time_obj)
@@ -71,11 +72,16 @@ def register_handlers(dispatcher):
                     scheduled_time = datetime.combine(now.date(), time_obj)
                     # Если время уже прошло, запланировать на следующий день
                     if scheduled_time <= now:
-                        scheduled_time += timedelta(days=1)
+                        raise ValueError("Время уже прошло")
                 add_job(bot, scheduled_time, event.from_chat, msg)
-                bot.send_text(chat_id=event.from_chat, text="Рассылка запланирована на {}".format(scheduled_time.strftime("%Y-%m-%d %H:%M")))
+                send_message(bot, event.from_chat, text="Рассылка запланирована на {}".format(scheduled_time.strftime("%Y-%m-%d %H:%M")))
+                # bot.send_text(chat_id=event.from_chat, text="Рассылка запланирована на {}".format(scheduled_time.strftime("%Y-%m-%d %H:%M")))
             except Exception as ex:
-                bot.send_text(chat_id=event.from_chat, text="Ошибка формата. Используйте:\n• HH:MM, Текст сообщения\n• DD-MM HH:MM, Текст сообщения")
+                send_message(bot, event.from_chat, text="Ошибка формата. Используйте:\n• HH:MM, Текст сообщения\n• DD-MM HH:MM, Текст сообщения")
+                # bot.send_text(chat_id=event.from_chat, text="Ошибка формата. Используйте:\n• HH:MM, Текст сообщения\n• DD-MM HH:MM, Текст сообщения")
+            except ValueError as ex:
+                send_message(bot, event.from_chat, text="Время уже прошло")
+                # bot.send_text(chat_id=event.from_chat, text="Время уже прошло")
             del pending_schedule[event.from_chat]
         else:
             send_message(bot, event.from_chat, text="Отвечаю на сообщение: {}".format(event.text))

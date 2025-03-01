@@ -26,6 +26,7 @@ def register_handlers(dispatcher):
 
 
     def start_command_cb(bot, event):
+        reporter.log_event("start_command", {"chat_id": event.from_chat, "inline_keyboard": True})
         bot.send_text(chat_id=event.from_chat, 
                       text="Привет! Я бот для создания автоматической рассылки пользователям.",
                       inline_keyboard_markup="{}".format(json.dumps([

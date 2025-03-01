@@ -59,7 +59,7 @@ class ReportManager:
 
     def log_event(self, event_type, data):
         entry = {
-            "timestamp": datetime.now().datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+            "timestamp": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             "event": event_type,
             "data": data
         }

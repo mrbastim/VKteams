@@ -1,6 +1,5 @@
 import time
 from datetime import datetime
-from commands import reporter
 
 
 scheduled_jobs = []
@@ -17,6 +16,7 @@ def remove_all_jobs():
 
 
 def start_scheduler():
+    from commands import reporter
     while True:
         now = datetime.now()
         for job in scheduled_jobs[:]:

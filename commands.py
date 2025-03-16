@@ -108,7 +108,8 @@ def register_handlers(dispatcher):
                         email = email[2:-2] if email.endswith(']\xa0') else email[2:-1]
                         email = email.strip()
                     if not email or not email_regex.match(email):
-                        raise ValueError(f"Неверный формат корпоративной почты: {email}")
+                        send_message(bot, chat_id, f"Неверный формат корпоративной почты: {email}. Повторите ввод.")
+                        return
                     emails.append(email)
                 if not emails:
                     send_message(bot, chat_id, "Не найдены корпоративные почты. Повторите ввод.")
@@ -140,11 +141,12 @@ def register_handlers(dispatcher):
             elif state.get("step") == "time":
                 try:
                     time_str = event.text.strip().replace(".", ":")
-                    time_obj = datetime.strptime(time_str, "%H:%M").time()
+                    # time_obj = datetime.strptime(time_str, "%H:%M").time()
                     # Объединяем введённую дату и время
                     scheduled_datetime = datetime.strptime(state["date"] + " " + time_str, "%Y-%m-%d %H:%M")
                     if scheduled_datetime <= datetime.now():
-                        raise ValueError("Дата и время уже прошли")
+                        # raise ValueError("Дата и время уже прошли")
+                        send_message(bot, chat_id, text="Дата и время уже прошли")
                     
                     for email in state["emails"]:
                         msg_final = f"Сообщение от {chat_id}\n\n {state['msg']}"
@@ -152,7 +154,7 @@ def register_handlers(dispatcher):
                     
                     send_message(bot, chat_id, text="Рассылка запланирована на {}".format(scheduled_datetime.strftime("%Y-%m-%d %H:%M")))
                 except ValueError as ex:
-                    send_message(bot, chat_id, text=str(ex))
+                    send_message(bot, chat_id, text="Ошибка: " + str(ex) + "\nОбратитесь к администратору.")
                 finally:
                     del pending_schedule[chat_id]
         else:

@@ -5,6 +5,7 @@ from bot.filter import Filter
 from reporting import ReportManager
 from scheduler import add_job, remove_all_jobs, scheduled_jobs
 import keyboards
+import re
 
 pending_schedule = {}  # хранение состояний ввода для рассылки
 
@@ -98,7 +99,17 @@ def register_handlers(dispatcher):
             state = pending_schedule[chat_id]
             # Шаг 1. Ввод почт
             if state.get("step") == "emails":
-                emails = [email.strip() for email in event.text.split(",") if email.strip()]
+                email_regex = re.compile(r'^[\w\.-]+@[\w\.-]+\.\w+$')
+                emails = []
+                for item in event.text.split(","):
+                    email = item.strip()
+                    # Обработка строки вида '@[email]\xa0' или '@[email]', когда пользователь вводится через @
+                    if email.startswith('@[') and (email.endswith(']\xa0') or email.endswith(']')):
+                        email = email[2:-2] if email.endswith(']\xa0') else email[2:-1]
+                        email = email.strip()
+                    if not email or not email_regex.match(email):
+                        raise ValueError(f"Неверный формат корпоративной почты: {email}")
+                    emails.append(email)
                 if not emails:
                     send_message(bot, chat_id, "Не найдены корпоративные почты. Повторите ввод.")
                     return
@@ -136,8 +147,9 @@ def register_handlers(dispatcher):
                         raise ValueError("Дата и время уже прошли")
                     
                     for email in state["emails"]:
-                        msg_final = f"Сообщение от {chat_id}\n '{state['msg']}'"
+                        msg_final = f"Сообщение от {chat_id}\n\n {state['msg']}"
                         add_job(bot, scheduled_datetime, email, msg_final)
+                    
                     send_message(bot, chat_id, text="Рассылка запланирована на {}".format(scheduled_datetime.strftime("%Y-%m-%d %H:%M")))
                 except ValueError as ex:
                     send_message(bot, chat_id, text=str(ex))

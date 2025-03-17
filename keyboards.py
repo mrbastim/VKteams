@@ -16,3 +16,10 @@ date_choice = "{}".format(json.dumps([
         {"text": "🔨 Выбрать дату вручную", "callbackData": "choose_date", "style": "primary"}
     ]
 ]))
+
+email_choice = "{}".format(json.dumps([
+    [
+        {"text": "👤 Отправить в личные сообщения", "callbackData": "send_personally", "style": "primary"},
+        {"text": "👥 Отправить в беседу", "callbackData": "send_to_conversation", "style": "primary"}
+    ]
+]))

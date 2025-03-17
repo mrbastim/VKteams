@@ -15,6 +15,20 @@ def send_message(bot, chat_id, text, inline_keyboard=None):
     reporter.log_event("message_sent", {"chat_id": chat_id, "text": text})
     bot.send_text(chat_id=chat_id, text=text, inline_keyboard_markup=inline_keyboard)
 
+def extract_emails(bot, input_text, chat_id, email_regex):
+    emails = []
+    for item in input_text.split(","):
+        email = item.strip()
+        # Обработка строки вида '@[email]\xa0' или '@[email]', когда пользователь вводит через @
+        if not email or not email_regex.match(email):
+            send_message(bot, chat_id, f"Неверный формат корпоративной почты: {email}. Повторите ввод.")
+            return None
+        if email.startswith('@[') and (email.endswith(']\xa0') or email.endswith(']')):
+            email = email[2:-2] if email.endswith(']\xa0') else email[2:-1]
+            email = email.strip() 
+        emails.append(email)
+    return emails
+
 def parse_scheduled_input(input_text):
     """
     Парсит ввод вида "datetime, сообщение" и возвращает кортеж (scheduled_time, msg).
@@ -93,6 +107,11 @@ def register_handlers(dispatcher):
                       inline_keyboard_markup=keyboards.start
                     )
 
+    def new_msg_command_cb(bot, event):
+        reporter.log_event("new_message_command", {"chat_id": event.from_chat})
+        send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
+        pending_schedule[event.from_chat] = {"step": "emails"}
+
     def message_cb(bot, event):
         chat_id = event.from_chat
         if pending_schedule.get(chat_id):
@@ -100,17 +119,9 @@ def register_handlers(dispatcher):
             # Шаг 1. Ввод почт
             if state.get("step") == "emails":
                 email_regex = re.compile(r'^[\w\.-]+@[\w\.-]+\.\w+$')
-                emails = []
-                for item in event.text.split(","):
-                    email = item.strip()
-                    # Обработка строки вида '@[email]\xa0' или '@[email]', когда пользователь вводится через @
-                    if email.startswith('@[') and (email.endswith(']\xa0') or email.endswith(']')):
-                        email = email[2:-2] if email.endswith(']\xa0') else email[2:-1]
-                        email = email.strip()
-                    if not email or not email_regex.match(email):
-                        send_message(bot, chat_id, f"Неверный формат корпоративной почты: {email}. Повторите ввод.")
-                        return
-                    emails.append(email)
+                emails = extract_emails(bot, event.text, chat_id, email_regex)
+                if emails is None:
+                    return
                 if not emails:
                     send_message(bot, chat_id, "Не найдены корпоративные почты. Повторите ввод.")
                     return
@@ -160,6 +171,7 @@ def register_handlers(dispatcher):
         else:
             send_message(bot, chat_id, text="Отвечаю на сообщение: {}".format(event.text))
 
+    dispatcher.add_handler(CommandHandler(command="new_message", callback=new_msg_command_cb))
     dispatcher.add_handler(StartCommandHandler(callback=start_command_cb))
     dispatcher.add_handler(MessageHandler(filters=Filter.text, callback=message_cb))
     dispatcher.add_handler(BotButtonCommandHandler(callback=buttons_answer_cb))

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-import json
 from bot.handler import MessageHandler, CommandHandler, BotButtonCommandHandler, StartCommandHandler
 from bot.filter import Filter
+from bot.dispatcher import Dispatcher
 from reporting import ReportManager
 from scheduler import add_job, remove_all_jobs, scheduled_jobs
 import keyboards
@@ -62,7 +62,7 @@ def parse_scheduled_input(input_text):
         raise ValueError("Дата и время уже прошли")
     return scheduled_time, msg
 
-def register_handlers(dispatcher):
+def register_handlers(dispatcher: Dispatcher):
 
     def buttons_answer_cb(bot, event):
         reporter.log_event("button_click", {"chat_id": event.from_chat, "callback_data": event.data['callbackData']})
@@ -97,8 +97,15 @@ def register_handlers(dispatcher):
                 show_alert=False
             )
         elif event.data['callbackData'] == "call_back_scheduler":
+            # send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
+            # pending_schedule[event.from_chat] = {"step": "emails"}
+            send_message(bot, event.from_chat, text="Выберите действие", inline_keyboard=keyboards.email_choice)
+        elif event.data['callbackData'] == "send_personally":
             send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
             pending_schedule[event.from_chat] = {"step": "emails"}
+        elif event.data['callbackData'] == "send_to_conversation":
+            send_message(bot, event.from_chat, text="Введите ссылки на беседы через запятую")
+            pending_schedule[event.from_chat] = {"step": "conversation"}
 
     def start_command_cb(bot, event):
         reporter.log_event("start_command", {"chat_id": event.from_chat, "inline_keyboard": True})
@@ -116,7 +123,7 @@ def register_handlers(dispatcher):
         chat_id = event.from_chat
         if pending_schedule.get(chat_id):
             state = pending_schedule[chat_id]
-            # Шаг 1. Ввод почт
+            # Шаг 1. Ввод почт или ссылок на беседы
             if state.get("step") == "emails":
                 email_regex = re.compile(r'^[\w\.-]+@[\w\.-]+\.\w+$')
                 emails = extract_emails(bot, event.text, chat_id, email_regex)
@@ -129,6 +136,20 @@ def register_handlers(dispatcher):
                 state["step"] = "msg"
                 send_message(bot, chat_id, "Введите текст сообщения для рассылки:")
                 return
+            elif state.get("step") == "conversation":
+                pattern = r"https?://myteam\.mail\.ru/profile/([\w_]+)"
+                links = [link.strip() for link in event.text.split(",")]
+                chat_names = []
+                for link in links:
+                    match = re.match(pattern, link)
+                    if match:
+                        chat_names.append(match.group(1))
+                    else:
+                        send_message(bot, event.from_chat, f"Неверный формат ссылки: {link}. Повторите ввод.")
+                        return
+                state["conversation"] = chat_names
+                state["step"] = "msg"
+                send_message(bot, event.from_chat, text="Введите текст сообщения для рассылки:")
             # Шаг 2. Ввод сообщения
             elif state.get("step") == "msg":
                 state["msg"] = event.text.strip()
@@ -152,26 +173,31 @@ def register_handlers(dispatcher):
             elif state.get("step") == "time":
                 try:
                     time_str = event.text.strip().replace(".", ":")
-                    # time_obj = datetime.strptime(time_str, "%H:%M").time()
                     # Объединяем введённую дату и время
                     scheduled_datetime = datetime.strptime(state["date"] + " " + time_str, "%Y-%m-%d %H:%M")
                     if scheduled_datetime <= datetime.now():
                         # raise ValueError("Дата и время уже прошли")
                         send_message(bot, chat_id, text="Дата и время уже прошли")
-                    
-                    for email in state["emails"]:
-                        msg_final = f"Сообщение от {chat_id}\n\n {state['msg']}"
-                        add_job(bot, scheduled_datetime, email, msg_final)
+                    if "emails" in state:
+                        for email in state["emails"]:
+                            msg_final = f"Сообщение от {chat_id}\n\n {state['msg']}"
+                            add_job(bot, scheduled_datetime, email, msg_final)
+                    else:
+                        for chat_name in state["conversation"]:
+                            msg_final = f"Сообщение от {chat_id}\n\n {state['msg']}"
+                            add_job(bot, scheduled_datetime, chat_name, msg_final)
                     
                     send_message(bot, chat_id, text="Рассылка запланирована на {}".format(scheduled_datetime.strftime("%Y-%m-%d %H:%M")))
                 except ValueError as ex:
-                    send_message(bot, chat_id, text="Ошибка: " + str(ex) + "\nОбратитесь к администратору.")
+                    bot.send_text(bot, chat_id, text="Ошибка: " + str(ex) + "\nОбратитесь к администратору.")
                 finally:
+                    reporter.log_event("error", {"chat_id": chat_id, "error": str(ex)})
                     del pending_schedule[chat_id]
-        else:
+
+        elif not event.text.startswith("/"):
             send_message(bot, chat_id, text="Отвечаю на сообщение: {}".format(event.text))
 
     dispatcher.add_handler(CommandHandler(command="new_message", callback=new_msg_command_cb))
     dispatcher.add_handler(StartCommandHandler(callback=start_command_cb))
-    dispatcher.add_handler(MessageHandler(filters=Filter.text, callback=message_cb))
+    dispatcher.add_handler(MessageHandler(filters=Filter.message, callback=message_cb))
     dispatcher.add_handler(BotButtonCommandHandler(callback=buttons_answer_cb))

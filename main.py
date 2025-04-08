@@ -9,7 +9,6 @@ bot = Bot(token=TOKEN)
 register_handlers(bot.dispatcher)
 bot.start_polling()
 
-bot.send_text(chat_id="AoLI9L5XdY0EcyKSGVg", text="Bot started")
 scheduler_thread = threading.Thread(target=scheduler.start_scheduler, daemon=True)
 scheduler_thread.start()
 

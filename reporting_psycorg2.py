@@ -34,3 +34,16 @@ class ReportManager:
                 (datetime.now(), event_type, json.dumps(data))
             )
             self.conn.commit()
+
+    # Добавляем метод flush для согласования с JSON вариантом
+    def flush(self):
+        # Для PostgreSQL логи сразу фиксируются, дополнительных действий не требуется
+        pass
+
+    # Добавляем деструктор для корректного закрытия подключения
+    def __del__(self):
+        try:
+            if self.conn:
+                self.conn.close()
+        except Exception:
+            pass

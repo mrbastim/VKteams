@@ -12,20 +12,28 @@ pending_schedule = {}  # хранение состояний ввода для �
 reporter = ReportManager()
 
 def send_message(bot, chat_id, text, inline_keyboard=None):
+    """
+    Отправляет сообщение в чат с указанным текстом и клавиатурой.
+    Если inline_keyboard не передан, используется клавиатура по умолчанию.
+    """
     reporter.log_event("message_sent", {"chat_id": chat_id, "text": text})
     bot.send_text(chat_id=chat_id, text=text, inline_keyboard_markup=inline_keyboard)
 
 def extract_emails(bot, input_text, chat_id, email_regex):
+    """
+    Извлекает и проверяет корпоративные почты из строки.
+    Если почта не соответствует формату, отправляет сообщение об ошибке.
+    """
     emails = []
     for item in input_text.split(","):
         email = item.strip()
         # Обработка строки вида '@[email]\xa0' или '@[email]', когда пользователь вводит через @
-        if not email or not email_regex.match(email):
-            send_message(bot, chat_id, f"Неверный формат корпоративной почты: {email}. Повторите ввод.")
-            return None
         if email.startswith('@[') and (email.endswith(']\xa0') or email.endswith(']')):
             email = email[2:-2] if email.endswith(']\xa0') else email[2:-1]
             email = email.strip() 
+        if not email or not email_regex.match(email):
+            send_message(bot, chat_id, f"Неверный формат корпоративной почты: {email}. Повторите ввод.")
+            return None
         emails.append(email)
     return emails
 
@@ -82,6 +90,22 @@ def register_handlers(dispatcher: Dispatcher):
             if state.get("step") == "date":
                 state["step"] = "custom_date"
                 send_message(bot, event.from_chat, text="Введите дату в формате YYYY-MM-DD:")
+        elif event.data['callbackData'] == "now":
+            state = pending_schedule.get(event.from_chat, {})
+            if state.get("step") == "date":
+                # Используем текущее время для моментальной отправки
+                scheduled_datetime = datetime.now()
+                if "emails" in state:
+                    for email in state["emails"]:
+                        msg_final = f"Сообщение от {event.from_chat}\n\n {state['msg']}"
+                        add_job(bot, scheduled_datetime, email, msg_final)
+                else:
+                    for chat_name in state["conversation"]:
+                        msg_final = f"Сообщение от {event.from_chat}\n\n {state['msg']}"
+                        add_job(bot, scheduled_datetime, chat_name, msg_final)
+                send_message(bot, event.from_chat, text="Сообщение отправлено")
+                del pending_schedule[event.from_chat]
+                return
         elif event.data['callbackData'] == "call_back_scheduler_delete":
             remove_all_jobs()
             bot.answer_callback_query(
@@ -90,15 +114,17 @@ def register_handlers(dispatcher: Dispatcher):
                 show_alert=False
             )
             reporter.log_event("all_jobs_deleted", {"chat_id": event.from_chat})
-        elif event.data['callbackData'] == "call_back_id_3":
-            bot.answer_callback_query(
-                query_id=event.data['queryId'],
-                text="{}".format(scheduled_jobs),
-                show_alert=False
-            )
+        elif event.data['callbackData'] == "call_back_getjobs":
+            if scheduled_jobs:
+                text = "Запланированные рассылки:\n"
+                for job in scheduled_jobs:
+                    text += f"- {job['email']}: {job['msg']} в {job['scheduled_time']}\n"
+                bot.edit_text(event.from_chat, event.msgId, text=text, inline_keyboard_markup=keyboards.back_to_main)
+                reporter.log_event("jobs_sent", {"chat_id": event.from_chat})
+            else: 
+                bot.edit_text(event.from_chat, event.msgId, text="Нет запланированных рассылок", inline_keyboard_markup=keyboards.back_to_main)
+                reporter.log_event("no_jobs_sent", {"chat_id": event.from_chat})
         elif event.data['callbackData'] == "call_back_scheduler":
-            # send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
-            # pending_schedule[event.from_chat] = {"step": "emails"}
             send_message(bot, event.from_chat, text="Выберите действие", inline_keyboard=keyboards.email_choice)
         elif event.data['callbackData'] == "send_personally":
             send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
@@ -106,6 +132,11 @@ def register_handlers(dispatcher: Dispatcher):
         elif event.data['callbackData'] == "send_to_conversation":
             send_message(bot, event.from_chat, text="Введите ссылки на беседы через запятую")
             pending_schedule[event.from_chat] = {"step": "conversation"}
+        elif event.data['callbackData'] == "back_to_main":
+            bot.edit_text(event.from_chat, event.msgId, text="Выберите действие", inline_keyboard_markup=keyboards.start)
+            reporter.log_event("back_to_main", {"chat_id": event.from_chat})
+            if pending_schedule.get(event.from_chat):
+                del pending_schedule[event.from_chat]           
 
     def start_command_cb(bot, event):
         reporter.log_event("start_command", {"chat_id": event.from_chat, "inline_keyboard": True})
@@ -115,9 +146,8 @@ def register_handlers(dispatcher: Dispatcher):
                     )
 
     def new_msg_command_cb(bot, event):
-        reporter.log_event("new_message_command", {"chat_id": event.from_chat})
-        send_message(bot, event.from_chat, text="Введите корпоративные почты сотрудников, разделенные запятыми")
-        pending_schedule[event.from_chat] = {"step": "emails"}
+        reporter.log_event("new_message_command", {"chat_id": event.from_chat, "inline_keyboard": True})
+        bot.send_text(event.from_chat, text="Выберите действие", inline_keyboard_markup=keyboards.email_choice)
 
     def message_cb(bot, event):
         chat_id = event.from_chat
@@ -190,12 +220,14 @@ def register_handlers(dispatcher: Dispatcher):
                     send_message(bot, chat_id, text="Рассылка запланирована на {}".format(scheduled_datetime.strftime("%Y-%m-%d %H:%M")))
                 except ValueError as ex:
                     bot.send_text(bot, chat_id, text="Ошибка: " + str(ex) + "\nОбратитесь к администратору.")
-                finally:
                     reporter.log_event("error", {"chat_id": chat_id, "error": str(ex)})
                     del pending_schedule[chat_id]
 
         elif not event.text.startswith("/"):
-            send_message(bot, chat_id, text="Отвечаю на сообщение: {}".format(event.text))
+            send_message(bot, chat_id, text="Отвечаю на ваше сообщение: {}".format(event.text))
+        else:
+            send_message(bot, chat_id, text="Команда не распознана.")
+            reporter.log_event("message_received", {"chat_id": chat_id, "text": event.text})
 
     dispatcher.add_handler(CommandHandler(command="new_message", callback=new_msg_command_cb))
     dispatcher.add_handler(StartCommandHandler(callback=start_command_cb))

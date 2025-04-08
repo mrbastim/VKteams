@@ -1,8 +1,7 @@
-from bot.bot import Bot, Dispatcher
+from bot.bot import Bot
 from config import TOKEN
 from commands import register_handlers
 import threading
-import time
 import scheduler  
 
 bot = Bot(token=TOKEN)

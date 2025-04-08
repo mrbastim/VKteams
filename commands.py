@@ -128,6 +128,8 @@ def handle_time_step(bot, chat_id, state, event):
                 msg_final = f"Сообщение от {chat_id}\n\n{state['msg']}"
                 add_job(bot, scheduled_datetime, chat_name, msg_final)
         send_message(bot, chat_id, "Рассылка запланирована на " + scheduled_datetime.strftime("%Y-%m-%d %H:%M"))
+        pending_schedule.pop(chat_id, None)
+
     except ValueError as ex:
         bot.send_text(chat_id, text="Ошибка: " + str(ex) + "\nОбратитесь к администратору.")
         reporter.log_event("error", {"chat_id": chat_id, "error": str(ex)})
@@ -198,7 +200,7 @@ def buttons_answer_cb(bot, event):
         if scheduled_jobs:
             text = "Запланированные рассылки:\n"
             for job in scheduled_jobs:
-                text += f"- {job['email']}: {job['msg']} в {job['scheduled_time']}\n"
+                text += f"- {job['chat_id']}: {job['text']} в {job['time']}\n"
             bot.edit_text(chat_id, event.msgId, text=text, inline_keyboard_markup=keyboards.back_to_main)
             reporter.log_event("jobs_sent", {"chat_id": chat_id})
         else:
